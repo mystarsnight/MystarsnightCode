@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Codies V7.2</title>
+<title>Codies V7.3 FIXED</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
@@ -27,7 +27,6 @@ header{
   height:calc(100vh - 55px);
 }
 
-/* SIDEBAR */
 .sidebar{
   width:280px;
   background:#0f0f0f;
@@ -35,14 +34,12 @@ header{
   border-right:1px solid #222;
 }
 
-/* FEED */
 .feed{
   flex:1;
   overflow:auto;
   padding:20px;
 }
 
-/* POST */
 .card{
   background:#151515;
   padding:12px;
@@ -51,7 +48,6 @@ header{
   border:1px solid #222;
 }
 
-/* INPUTS */
 input,textarea{
   width:100%;
   margin:6px 0;
@@ -62,7 +58,6 @@ input,textarea{
   border-radius:8px;
 }
 
-/* BUTTON */
 button{
   width:100%;
   padding:10px;
@@ -73,7 +68,6 @@ button{
   cursor:pointer;
 }
 
-/* MODAL */
 .modal{
   display:none;
   position:fixed;
@@ -91,7 +85,6 @@ button{
   border:1px solid #333;
 }
 
-/* POPUP */
 .popup{
   position:fixed;
   bottom:20px;
@@ -109,13 +102,12 @@ button{
 <body>
 
 <header>
-  <div>Codies</div>
+  <div>Codies V7.3 🚀</div>
   <div id="userBox"></div>
 </header>
 
 <div class="main">
 
-<!-- SIDEBAR -->
 <div class="sidebar">
 
   <h3>Create Code</h3>
@@ -127,11 +119,10 @@ button{
   <button onclick="createPost()">Post</button>
 
   <button onclick="openLogin()">Login</button>
-  <button id="adminBtn" style="display:none" onclick="openAdmin()">Admin Panel</button>
+  <button id="adminBtn" style="display:none" onclick="openAdmin()">Admin</button>
 
 </div>
 
-<!-- FEED -->
 <div class="feed" id="feed"></div>
 
 </div>
@@ -152,7 +143,7 @@ button{
 <!-- ADMIN -->
 <div class="modal" id="adminModal">
   <div class="box">
-    <h3>Admin Panel !!!</h3>
+    <h3>Admin Panel</h3>
 
     <input id="targetUser" placeholder="User email">
 
@@ -164,7 +155,6 @@ button{
   </div>
 </div>
 
-<!-- POPUP -->
 <div class="popup" id="popup"></div>
 
 <script>
@@ -187,6 +177,14 @@ function show(msg){
   setTimeout(()=>p.style.display="none",2000)
 }
 
+/* ================= ADMIN OVERRIDE ================= */
+function isAdmin(){
+  return (
+    profile?.role === "admin" ||
+    user?.email === "blakestalder123@gmail.com"
+  )
+}
+
 /* ================= USER ================= */
 async function getUser(){
   const { data } = await client.auth.getUser()
@@ -194,6 +192,7 @@ async function getUser(){
 
   if(user){
     await loadProfile()
+    await loadPosts()
   }
 
   updateUI()
@@ -238,7 +237,6 @@ async function login(){
 
   closeLogin()
   getUser()
-  loadPosts()
 }
 
 async function signup(){
@@ -275,7 +273,7 @@ async function loadPosts(){
     .order("created_at",{ascending:false})
 
   if(error){
-    feed.innerHTML = "<div>DB error: "+error.message+"</div>"
+    feed.innerHTML = `<div>${error.message}</div>`
     return
   }
 
@@ -301,10 +299,6 @@ async function loadPosts(){
 }
 
 /* ================= ADMIN ================= */
-function isAdmin(){
-  return profile?.role === "admin"
-}
-
 function openAdmin(){
   if(!isAdmin()) return show("Not admin")
   adminModal.style.display="flex"
@@ -319,14 +313,13 @@ async function warn(){
     user_email:targetUser.value,
     reason:"warning"
   })
-
   show("User warned")
 }
 
 async function ban(){
   await client.from("profiles")
     .update({ banned:true })
-    .eq("email", targetUser.value)
+    .eq("email",targetUser.value)
 
   show("User banned")
 }
@@ -334,7 +327,7 @@ async function ban(){
 async function verify(){
   await client.from("profiles")
     .update({ verified:true })
-    .eq("email", targetUser.value)
+    .eq("email",targetUser.value)
 
   show("User verified")
 }
@@ -358,7 +351,6 @@ client.auth.onAuthStateChange((_, session)=>{
 })
 
 getUser()
-loadPosts()
 
 </script>
 
