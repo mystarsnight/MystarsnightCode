@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Mystarsnight Code</title>
+<title>Mystarsnight Social</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
@@ -14,6 +14,7 @@ body{
   color:white;
 }
 
+/* AUTH */
 #auth{
   display:flex;
   height:100vh;
@@ -23,25 +24,28 @@ body{
   gap:8px;
 }
 
-input{
+input, textarea{
   padding:10px;
   border:none;
   border-radius:10px;
   background:#1a1a1a;
   color:white;
+  width:240px;
 }
 
 button{
   padding:10px;
   border:none;
   border-radius:10px;
+  cursor:pointer;
   background:linear-gradient(45deg,#00f5ff,#9f00ff);
   color:white;
-  cursor:pointer;
 }
 
+/* APP */
 #app{display:none;}
 
+/* TOP */
 #top{
   display:flex;
   justify-content:center;
@@ -57,42 +61,49 @@ button{
   cursor:pointer;
 }
 
+/* FEED */
 .feed{
-  height:calc(100vh - 60px);
+  height:calc(100vh - 120px);
   overflow-y:auto;
   padding:10px;
 }
 
+/* POST */
 .post{
   background:#151515;
   margin:10px auto;
   padding:15px;
   border-radius:12px;
-  max-width:400px;
+  max-width:420px;
 }
 
-.actions{
-  display:flex;
-  justify-content:space-between;
+.post img{
+  width:100%;
+  border-radius:10px;
   margin-top:10px;
 }
 
-.icon{
-  background:#222;
-  padding:6px 10px;
-  border-radius:8px;
-  cursor:pointer;
+/* AVATAR */
+.avatar{
+  width:40px;
+  height:40px;
+  border-radius:50%;
+  object-fit:cover;
+  border:2px solid #00f5ff;
 }
 
+/* POST BOX */
 #postBox{
   position:fixed;
-  bottom:15px;
+  bottom:10px;
   left:50%;
   transform:translateX(-50%);
   display:flex;
-  gap:10px;
+  flex-direction:column;
+  gap:6px;
 }
 
+/* NOTIF */
 #notif{
   position:fixed;
   top:20px;
@@ -102,6 +113,7 @@ button{
   padding:10px;
   border-radius:10px;
   display:none;
+  z-index:999;
 }
 </style>
 </head>
@@ -112,11 +124,14 @@ button{
 
 <!-- AUTH -->
 <div id="auth">
-  <h2>Mystarsnight Code</h2>
+  <h2>Mystarsnight Social</h2>
+
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
   <input id="username" placeholder="Username">
-  <input id="avatar" placeholder="Avatar URL">
+
+  <label>Avatar image:</label>
+  <input type="file" id="avatarFile">
 
   <button onclick="signup()">Sign Up</button>
   <button onclick="login()">Login</button>
@@ -134,8 +149,9 @@ button{
   <div class="feed" id="codies" style="display:none;"></div>
 
   <div id="postBox">
-    <input id="postInput" placeholder="Post code...">
-    <button onclick="post()">🚀</button>
+    <textarea id="postInput" placeholder="Write post..."></textarea>
+    <input type="file" id="postFile">
+    <button onclick="post()">Post 🚀</button>
   </div>
 
 </div>
@@ -147,16 +163,32 @@ const supabase = supabase.createClient(
 );
 
 let user=null;
+let offset=0;
+const limit=5;
 
 /* NOTIF */
-function notify(msg){
-  notif.innerText=msg;
+function notify(t){
+  notif.innerText=t;
   notif.style.display="block";
   setTimeout(()=>notif.style.display="none",2000);
 }
 
-/* SIGNUP FIXED */
+/* UPLOAD FILE */
+async function upload(bucket,file){
+  const name = Date.now()+"_"+file.name;
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(name,file);
+
+  if(error) return null;
+
+  return supabase.storage.from(bucket).getPublicUrl(name).data.publicUrl;
+}
+
+/* SIGNUP (FIXED + AVATAR FILE) */
 async function signup(){
+
   const { data, error } = await supabase.auth.signUp({
     email: email.value,
     password: password.value
@@ -167,26 +199,26 @@ async function signup(){
     return;
   }
 
-  if(!data.user){
+  const u = data.user;
+  if(!u){
     notify("Check email to confirm signup");
     return;
   }
 
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .insert({
-      id: data.user.id,
-      username: username.value,
-      avatar_url: avatar.value,
-      is_admin: email.value === "blakestalder123@gmail.com"
-    });
+  let avatarUrl = null;
 
-  if(profileError){
-    notify(profileError.message);
-    return;
+  if(avatarFile.files.length > 0){
+    avatarUrl = await upload("avatars", avatarFile.files[0]);
   }
 
-  notify("Signup success!");
+  await supabase.from("profiles").insert({
+    id: u.id,
+    username: username.value,
+    avatar_url: avatarUrl,
+    is_admin: email.value==="blakestalder123@gmail.com"
+  });
+
+  notify("Signup complete");
 }
 
 /* LOGIN */
@@ -206,6 +238,7 @@ async function login(){
 
 /* START */
 async function start(u){
+
   const { data } = await supabase
     .from("profiles")
     .select("*")
@@ -217,35 +250,47 @@ async function start(u){
   auth.style.display="none";
   app.style.display="block";
 
-  loadDiscover();
-  loadCodies();
+  loadMore(true);
+  loadCodies(true);
+
+  setupScroll();
 }
 
-/* TAB SWITCH */
-function show(tab){
-  discover.style.display = tab==="discover"?"block":"none";
-  codies.style.display = tab==="codies"?"block":"none";
+/* INFINITE SCROLL */
+function setupScroll(){
+  discover.addEventListener("scroll",()=>{
+    if(discover.scrollTop + discover.clientHeight >= discover.scrollHeight - 10){
+      loadMore(false);
+    }
+  });
 }
 
-/* DISCOVER */
-async function loadDiscover(){
+/* LOAD DISCOVER (INFINITE) */
+async function loadMore(reset){
+
+  if(reset){
+    discover.innerHTML="";
+    offset=0;
+  }
+
   const { data } = await supabase
     .from("posts")
-    .select("*, profiles(username)")
-    .order("created_at",{ascending:false});
+    .select("*, profiles(username, avatar_url)")
+    .order("created_at",{ascending:false})
+    .range(offset, offset + limit - 1);
 
-  discover.innerHTML="";
+  offset += limit;
 
   data.forEach(p=>{
     discover.innerHTML+=`
       <div class="post">
-        <b>${p.profiles?.username||"User"}</b>
-        <p>${p.content}</p>
-
-        <div class="actions">
-          <div class="icon" onclick="like('${p.id}')">❤️</div>
-          <div class="icon" onclick="comment('${p.id}')">💬</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <img class="avatar" src="${p.profiles?.avatar_url||''}">
+          <b>${p.profiles?.username||"User"}</b>
         </div>
+
+        <p>${p.content}</p>
+        ${p.image ? `<img src="${p.image}">` : ""}
       </div>
     `;
   });
@@ -256,20 +301,17 @@ async function loadCodies(){
   const { data } = await supabase
     .from("posts")
     .select("*, profiles(username)")
-    .order("created_at",{ascending:false});
+    .order("created_at",{ascending:false})
+    .limit(20);
 
   codies.innerHTML="";
 
   data.forEach(p=>{
     codies.innerHTML+=`
       <div class="post">
-        <h3>${p.profiles?.username||"User"}</h3>
+        <b>${p.profiles?.username||"User"}</b>
         <p>${p.content}</p>
-
-        <div class="actions">
-          <div class="icon" onclick="like('${p.id}')">❤️</div>
-          <div class="icon" onclick="comment('${p.id}')">💬</div>
-        </div>
+        ${p.image ? `<img src="${p.image}">` : ""}
       </div>
     `;
   });
@@ -277,42 +319,30 @@ async function loadCodies(){
 
 /* POST */
 async function post(){
-  const { error } = await supabase.from("posts").insert({
-    user_id:user.id,
-    content:postInput.value
-  });
 
-  if(error){
-    notify(error.message);
-    return;
+  let img=null;
+
+  if(postFile.files.length>0){
+    img = await upload("posts", postFile.files[0]);
   }
 
+  await supabase.from("posts").insert({
+    user_id:user.id,
+    content:postInput.value,
+    image:img
+  });
+
   postInput.value="";
-  loadDiscover();
+  postFile.value="";
+
+  loadMore(true);
   loadCodies();
 }
 
-/* LIKE */
-async function like(id){
-  await supabase.from("likes").insert({
-    user_id:user.id,
-    post_id:id
-  });
-  notify("Liked!");
-}
-
-/* COMMENT */
-async function comment(id){
-  const t=prompt("Comment:");
-  if(!t) return;
-
-  await supabase.from("comments").insert({
-    user_id:user.id,
-    post_id:id,
-    content:t
-  });
-
-  notify("Comment sent");
+/* TAB */
+function show(tab){
+  discover.style.display = tab==="discover"?"block":"none";
+  codies.style.display = tab==="codies"?"block":"none";
 }
 </script>
 
