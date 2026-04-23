@@ -1,177 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Mystarsnight Code</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
-<style>
-body{
-  margin:0;
-  font-family:system-ui;
-  background:radial-gradient(circle,#121212,#000);
-  color:white;
-}
-
-/* ANIMATIONS */
-@keyframes fade {
-  from {opacity:0; transform:translateY(10px);}
-  to {opacity:1; transform:translateY(0);}
-}
-
-/* AUTH */
-#auth{
-  display:flex;
-  height:100vh;
-  align-items:center;
-  justify-content:center;
-  flex-direction:column;
-  gap:10px;
-  animation:fade 0.5s ease;
-}
-
-input{
-  padding:10px;
-  border:none;
-  border-radius:10px;
-  background:#1a1a1a;
-  color:white;
-  width:240px;
-  transition:0.2s;
-}
-
-input:focus{
-  outline:2px solid #00f5ff;
-  transform:scale(1.03);
-}
-
-/* BUTTON */
-button{
-  padding:10px 14px;
-  border:none;
-  border-radius:10px;
-  cursor:pointer;
-  background:linear-gradient(45deg,#00f5ff,#9f00ff);
-  color:white;
-  transition:0.2s;
-}
-
-button:hover{
-  transform:scale(1.05);
-}
-
-/* APP */
-#app{
-  display:none;
-  animation:fade 0.5s ease;
-}
-
-/* TOP BAR */
-#top{
-  display:flex;
-  justify-content:center;
-  gap:10px;
-  padding:10px;
-  background:#111;
-}
-
-.tab{
-  padding:8px 14px;
-  background:#222;
-  border-radius:10px;
-  cursor:pointer;
-}
-
-/* FEEDS */
-.feed{
-  height:calc(100vh - 60px);
-  overflow-y:auto;
-  padding:10px;
-}
-
-/* POST */
-.post{
-  background:#151515;
-  margin:10px auto;
-  padding:15px;
-  border-radius:12px;
-  max-width:420px;
-  animation:fade 0.3s ease;
-}
-
-/* CODIES STYLE (TIKTOK FEEL) */
-.codiesPost{
-  height:80vh;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-  background:#111;
-  margin:10px;
-  border-radius:20px;
-  animation:fade 0.3s ease;
-}
-
-/* POST BOX */
-#postBox{
-  position:fixed;
-  bottom:10px;
-  left:50%;
-  transform:translateX(-50%);
-  display:flex;
-  gap:10px;
-}
-
-/* NOTIF */
-#msg{
-  position:fixed;
-  top:20px;
-  left:50%;
-  transform:translateX(-50%);
-  background:#222;
-  padding:10px;
-  border-radius:10px;
-  display:none;
-}
-</style>
-</head>
-
-<body>
-
-<div id="msg"></div>
-
-<!-- AUTH -->
-<div id="auth">
-  <h2>Mystarsnight Code</h2>
-
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-  <input id="username" placeholder="Username">
-
-  <button onclick="signup()">SIGN UP</button>
-  <button onclick="login()">LOGIN</button>
-</div>
-
-<!-- APP -->
-<div id="app">
-
-  <div id="top">
-    <div class="tab" onclick="show('discover')">🔍 Discover</div>
-    <div class="tab" onclick="show('codies')">🎥 Codies</div>
-  </div>
-
-  <div class="feed" id="discover"></div>
-  <div class="feed" id="codies" style="display:none;"></div>
-
-  <div id="postBox">
-    <input id="postInput" placeholder="Post...">
-    <button onclick="post()">🚀</button>
-  </div>
-
-</div>
-
 <script>
 const supabase = supabase.createClient(
 "https://heemtxdkjxnlzggtpbsf.supabase.co",
@@ -180,54 +6,68 @@ const supabase = supabase.createClient(
 
 let user=null;
 
-/* MESSAGE */
+/* UI MESSAGE */
 function showMsg(t){
   msg.innerText=t;
   msg.style.display="block";
   setTimeout(()=>msg.style.display="none",2000);
 }
 
-/* SIGNUP */
+/* 🔥 FIXED SIGNUP (THIS IS THE IMPORTANT PART) */
 async function signup(){
+
+  if(!email.value || !password.value || !username.value){
+    showMsg("Fill all fields");
+    return;
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: email.value,
     password: password.value
   });
 
   if(error){
-    showMsg(error.message);
+    showMsg("Signup failed: " + error.message);
     return;
   }
 
-  if(!data.user){
+  const u = data.user;
+
+  if(!u){
     showMsg("Check email to confirm signup");
     return;
   }
 
-  await supabase.from("profiles").insert({
-    id: data.user.id,
+  const { error: profileError } = await supabase.from("profiles").insert({
+    id: u.id,
     username: username.value
   });
 
-  showMsg("Signup success");
+  if(profileError){
+    showMsg("Profile error: " + profileError.message);
+    return;
+  }
+
+  showMsg("Signup success! Now login");
 }
 
 /* LOGIN */
 async function login(){
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email.value,
     password: password.value
   });
 
   if(error){
-    showMsg(error.message);
+    showMsg("Login failed: " + error.message);
     return;
   }
 
   start(data.user);
 }
 
-/* START */
+/* START APP */
 async function start(u){
 
   const { data } = await supabase
@@ -245,13 +85,13 @@ async function start(u){
   loadCodies();
 }
 
-/* TAB SWITCH */
+/* TABS */
 function show(tab){
   discover.style.display = tab==="discover"?"block":"none";
   codies.style.display = tab==="codies"?"block":"none";
 }
 
-/* DISCOVER */
+/* LOAD DISCOVER */
 async function loadDiscover(){
   const { data } = await supabase
     .from("posts")
@@ -270,7 +110,7 @@ async function loadDiscover(){
   });
 }
 
-/* CODIES */
+/* LOAD CODIES */
 async function loadCodies(){
   const { data } = await supabase
     .from("posts")
@@ -301,6 +141,3 @@ async function post(){
   loadCodies();
 }
 </script>
-
-</body>
-</html>
